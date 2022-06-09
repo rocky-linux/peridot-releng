@@ -1,5 +1,3 @@
-#!/usr/bin/env python3
-
 #  -- peridot-releng-header-v0.1 --
 #  Copyright (c) Peridot-Releng Authors. All rights reserved.
 #
@@ -17,7 +15,7 @@
 #  may be used to endorse or promote products derived from this software without
 #  specific prior written permission.
 #
-#  THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
+#  THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS 'AS IS'
 #  AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
 #  IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
 #  ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE
@@ -33,19 +31,27 @@ import sys
 import requests
 import json
 
-from common import build_batches_url
+from itertools import islice
+
+from common import construct_url
 
 
-def get_batch(batch_type, task_id, status, page):
-    r = requests.get(build_batches_url(batch_type, task_id, page, status))
-    return r.json()[f'{batch_type}s']
+def chunks(lst, n):
+    for i in range(0, len(lst), n):
+        yield lst[i:i + n]
 
 
-def process_batch(batch_type, task_id, status):
+def get_packages(page):
+    r = requests.get(
+        construct_url(f'/packages?limit=100&page={page}&filters.no_builds=1'))
+    return r.json()['packages']
+
+
+def process_packages():
     ret = []
     page = 0
     while True:
-        res = get_batch(batch_type, task_id, status, page)
+        res = get_packages(page)
         if len(res) == 0:
             return ret
         ret.extend(res)
@@ -53,17 +59,12 @@ def process_batch(batch_type, task_id, status):
 
 
 if __name__ == '__main__':
-    batch_type = sys.argv[1]
-    task_id = sys.argv[2]
+    batch_items = process_packages()
 
-    batch_items = process_batch(batch_type, task_id, 4)
-
-    req = {}
-    key = f'{batch_type}s'
-    req[key] = []
+    builds = []
     for item in batch_items:
-        req[key].append({
+        builds.append({
             'package_name': item['name']
         })
-
-    print(json.dumps(req))
+    for chunk in chunks(builds, 400):
+        print(json.dumps({"builds": chunk}))

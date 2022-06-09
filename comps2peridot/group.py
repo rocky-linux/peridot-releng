@@ -1,5 +1,3 @@
-#!/usr/bin/env python3
-
 #  -- peridot-releng-header-v0.1 --
 #  Copyright (c) Peridot-Releng Authors. All rights reserved.
 #
@@ -29,41 +27,37 @@
 #  ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
 #  POSSIBILITY OF SUCH DAMAGE.
 
-import sys
-import requests
-import json
-
-from common import build_batches_url
+from dataclasses import dataclass
 
 
-def get_batch(batch_type, task_id, status, page):
-    r = requests.get(build_batches_url(batch_type, task_id, page, status))
-    return r.json()[f'{batch_type}s']
+@dataclass
+class PackageReq:
+    name: str
+    type: str
+    arches: list[str]
 
 
-def process_batch(batch_type, task_id, status):
-    ret = []
-    page = 0
-    while True:
-        res = get_batch(batch_type, task_id, status, page)
-        if len(res) == 0:
-            return ret
-        ret.extend(res)
-        page = page + 1
+@dataclass
+class Group:
+    id: str
+    name: dict[str, str]
+    description: dict[str, str]
+    default: bool
+    user_visible: bool
+    packages: list[PackageReq]
 
 
-if __name__ == '__main__':
-    batch_type = sys.argv[1]
-    task_id = sys.argv[2]
+@dataclass
+class EnvGroup:
+    name: str
+    arch: list[str]
 
-    batch_items = process_batch(batch_type, task_id, 4)
 
-    req = {}
-    key = f'{batch_type}s'
-    req[key] = []
-    for item in batch_items:
-        req[key].append({
-            'package_name': item['name']
-        })
-
-    print(json.dumps(req))
+@dataclass
+class Environment:
+    id: str
+    name: dict[str, str]
+    description: dict[str, str]
+    display_order: int
+    group_list: list[EnvGroup]
+    option_list: list[EnvGroup]

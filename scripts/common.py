@@ -1,5 +1,3 @@
-#!/usr/bin/env python3
-
 #  -- peridot-releng-header-v0.1 --
 #  Copyright (c) Peridot-Releng Authors. All rights reserved.
 #
@@ -17,7 +15,7 @@
 #  may be used to endorse or promote products derived from this software without
 #  specific prior written permission.
 #
-#  THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
+#  THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS 'AS IS'
 #  AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
 #  IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
 #  ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE
@@ -29,41 +27,16 @@
 #  ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
 #  POSSIBILITY OF SUCH DAMAGE.
 
-import sys
-import requests
-import json
-
-from common import build_batches_url
+BASE_URL = 'https://peridot-api.build.resf.org/v1'
+PROJECT_ID_PROD = '55b17281-bc54-4929-8aca-a8a11d628738'
 
 
-def get_batch(batch_type, task_id, status, page):
-    r = requests.get(build_batches_url(batch_type, task_id, page, status))
-    return r.json()[f'{batch_type}s']
+def construct_url(path, project_id=PROJECT_ID_PROD):
+    return f'{BASE_URL}/projects/{project_id}{path}'
 
 
-def process_batch(batch_type, task_id, status):
-    ret = []
-    page = 0
-    while True:
-        res = get_batch(batch_type, task_id, status, page)
-        if len(res) == 0:
-            return ret
-        ret.extend(res)
-        page = page + 1
-
-
-if __name__ == '__main__':
-    batch_type = sys.argv[1]
-    task_id = sys.argv[2]
-
-    batch_items = process_batch(batch_type, task_id, 4)
-
-    req = {}
-    key = f'{batch_type}s'
-    req[key] = []
-    for item in batch_items:
-        req[key].append({
-            'package_name': item['name']
-        })
-
-    print(json.dumps(req))
+def build_batches_url(batch_type, task_id, page, status,
+    project_id=PROJECT_ID_PROD):
+    return construct_url(
+        f'/{batch_type}_batches/{task_id}?page={page}&limit=100&filter.status={status}',
+        project_id)
