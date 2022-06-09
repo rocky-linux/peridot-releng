@@ -64,8 +64,11 @@ def main(pungi_conf_path: str, output_path: str):
     package_index = {}
 
     # Read prepopulate json and create package objects
+    all_arches = []
     for repo in gpjson.keys():
         for arch in gpjson[repo].keys():
+            if arch not in all_arches:
+                all_arches.append(arch)
             for package in gpjson[repo][arch].keys():
                 if package not in package_index:
                     package_index[package] = {}
@@ -83,6 +86,56 @@ def main(pungi_conf_path: str, output_path: str):
                     if na not in package_index[package][repo]["include_filter"]:
                         package_index[package][repo]["include_filter"].append(
                             na)
+
+    arch_specific_excludes = {}
+    na_index = {}
+    for pkg in package_index.keys():
+        for repo in package_index[pkg].keys():
+            na_list = list(filter(lambda x: x.endswith('.noarch'), package_index[pkg][repo]["include_filter"]))
+            if not na_list:
+                continue
+            exclude_arches = {}
+            for na in na_list:
+                for arch in all_arches:
+                    if arch not in gpjson[repo] or pkg not in gpjson[repo][arch] or na not in gpjson[repo][arch][pkg]:
+                        if na not in exclude_arches:
+                            exclude_arches[na] = []
+                        exclude_arches[na].append(arch)
+                na_index[na] = na
+            if not exclude_arches:
+                continue
+            if pkg not in arch_specific_excludes:
+                arch_specific_excludes[pkg] = {}
+            if repo not in arch_specific_excludes[pkg]:
+                arch_specific_excludes[pkg][repo] = []
+            arch_specific_excludes[pkg][repo].append(exclude_arches)
+
+    # Index arch specific excludes by repo and arch
+    repo_arch_index = {}
+    for pkg in arch_specific_excludes.keys():
+        for repo in arch_specific_excludes[pkg].keys():
+            if repo not in repo_arch_index:
+                repo_arch_index[repo] = {}
+            for arches2 in arch_specific_excludes[pkg][repo]:
+                for na in arches2.keys():
+                    for arch in arches2[na]:
+                        if arch not in repo_arch_index[repo]:
+                            repo_arch_index[repo][arch] = []
+                        if na not in repo_arch_index[repo][arch]:
+                            repo_arch_index[repo][arch].append(na)
+
+    # Add noarch packages not in a specific arch to exclude filter
+    for repo in repo_arch_index.keys():
+        repo_key = f"^{repo}$"
+        filter_tuple = {}
+        for arch in repo_arch_index[repo].keys():
+            if arch not in filter_tuple:
+                filter_tuple[arch] = []
+            for na in repo_arch_index[repo][arch]:
+                na = na.removesuffix('.noarch')
+                if na not in filter_tuple[arch]:
+                    filter_tuple[arch].append(na)
+        catalog.exclude_filter.append((repo_key, filter_tuple))
 
     for package in package_index.keys():
         catalog.add_package(
