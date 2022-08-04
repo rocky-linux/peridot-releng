@@ -280,10 +280,12 @@ def main(comps_path: str, variants_path: str, output_path: str):
                             groupbase = variants[variant_id]
                         if group.text not in groupbase:
                             continue
-                        groupind = groupbase[group.text]
+                        groupind = groupbase[group.text].copy()
                         for arch_group in groupind.keys():
                             if arch_group not in groups:
                                 groups[arch_group] = []
+                            if 'default' in group.attrib:
+                                groupind[arch_group].default = group.attrib['default'] == 'true'
                             groups[arch_group].append(groupind[arch_group])
                 elif child.tag == 'environments':
                     for environment in child:
@@ -311,13 +313,13 @@ def main(comps_path: str, variants_path: str, output_path: str):
     for arch in variant_arch_index.keys():
         for variant in variant_arch_index[arch].keys():
             write_variant(variant_arch_index[arch][variant] if variant in
-                                                               variant_arch_index[
-                                                                   arch] else [],
-                          environment_arch_index[arch][variant] if variant in
-                                                                   environment_arch_index[
-                                                                       arch] else [],
-                          categories[arch].copy(),
-                          f'{output_path}/{variant}-{arch}.xml')
+                          variant_arch_index[
+                arch] else [],
+                environment_arch_index[arch][variant] if variant in
+                environment_arch_index[
+                arch] else [],
+                categories[arch].copy(),
+                f'{output_path}/{variant}-{arch}.xml')
 
 
 if __name__ == '__main__':
