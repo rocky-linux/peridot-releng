@@ -38,8 +38,12 @@ class PeridotCatalogSyncPackageType(str, Enum):
     PACKAGE_TYPE_MODULE_FORK = "PACKAGE_TYPE_MODULE_FORK"
     PACKAGE_TYPE_MODULE_FORK_COMPONENT = "PACKAGE_TYPE_MODULE_FORK_COMPONENT"
     PACKAGE_TYPE_NORMAL_FORK_MODULE = "PACKAGE_TYPE_NORMAL_FORK_MODULE"
-    PACKAGE_TYPE_NORMAL_FORK_MODULE_COMPONENT = "PACKAGE_TYPE_NORMAL_FORK_MODULE_COMPONENT"
-    PACKAGE_TYPE_MODULE_FORK_MODULE_COMPONENT = "PACKAGE_TYPE_MODULE_FORK_MODULE_COMPONENT"
+    PACKAGE_TYPE_NORMAL_FORK_MODULE_COMPONENT = (
+        "PACKAGE_TYPE_NORMAL_FORK_MODULE_COMPONENT"
+    )
+    PACKAGE_TYPE_MODULE_FORK_MODULE_COMPONENT = (
+        "PACKAGE_TYPE_MODULE_FORK_MODULE_COMPONENT"
+    )
 
 
 @dataclass
@@ -49,12 +53,12 @@ class PeridotCatalogSyncRepository:
     multilib: list[str]
 
     def include_filter_to_prototxt(self):
-        return '\n' + '\n'.join(
-            [f"    include_filter: \"{f}\"" for f in self.include_filter])
+        return "\n" + "\n".join(
+            [f'    include_filter: "{f}"' for f in self.include_filter]
+        )
 
     def multilib_to_prototxt(self):
-        return '\n' + '\n'.join(
-            [f"    multilib: \"{f}\"" for f in self.multilib])
+        return "\n" + "\n".join([f'    multilib: "{f}"' for f in self.multilib])
 
 
 @dataclass
@@ -65,19 +69,26 @@ class PeridotCatalogSyncPackage:
     repositories: list[PeridotCatalogSyncRepository]
 
     def mc_to_prototxt(self):
-        return '\n' + '\n'.join(
-            [f"  module_component: \"{component}\"" for component in
-             self.module_components])
+        return "\n" + "\n".join(
+            [
+                f'  module_component: "{component}"'
+                for component in self.module_components
+            ]
+        )
 
     def repos_to_prototxt(self):
-        return '\n'.join(
-            [f"""  repository {{
+        return "\n".join(
+            [
+                f"""  repository {{
     name: \"{repo.name}\"{
             repo.include_filter_to_prototxt() if repo.include_filter else ""
             }{
             repo.multilib_to_prototxt() if repo.multilib else ""
             }
-  }}""" for repo in self.repositories])
+  }}"""
+                for repo in self.repositories
+            ]
+        )
 
 
 class PeridotCatalogSync:
@@ -91,42 +102,53 @@ class PeridotCatalogSync:
         self.packages.append(package)
 
     def additional_multilib_to_prototxt(self):
-        return '\n'.join(
-            [f"additional_multilib: \"{f}\"" for f in
-             self.additional_multilib])
+        return "\n".join(
+            [f'additional_multilib: "{f}"' for f in self.additional_multilib]
+        )
 
     def exclude_multilib_filter_to_prototxt(self):
-        return '\n' + '\n'.join(
-            [f"exclude_multilib_filter: \"{f}\"" for f in
-             self.exclude_multilib_filter])
+        return "\n" + "\n".join(
+            [f'exclude_multilib_filter: "{f}"' for f in self.exclude_multilib_filter]
+        )
 
     def filter_arch_to_prototxt(self, arch: dict):
-        nl = '\n'
+        nl = "\n"
         glob_match = {}
         for k, v in arch.items():
-            glob_match[k] = [f"    glob_match: \"{f}\"" for f in v]
+            glob_match[k] = [f'    glob_match: "{f}"' for f in v]
         for k in glob_match.keys():
             if len(glob_match[k]) > 0:
-                glob_match[k][0] = '\n' + glob_match[k][0]
-        return '\n'.join([f"""  arch {{
+                glob_match[k][0] = "\n" + glob_match[k][0]
+        return "\n".join(
+            [
+                f"""  arch {{
     key: \"{f}\"{nl.join(glob_match[f])}
-  }}""" for f in arch.keys()])
+  }}"""
+                for f in arch.keys()
+            ]
+        )
 
     def exclude_filter_to_prototxt(self):
-        return '\n' + '\n'.join(
-            [f"""exclude_filter {{
+        return "\n" + "\n".join(
+            [
+                f"""exclude_filter {{
   repo_match: \"{f[0]}\"
 {self.filter_arch_to_prototxt(f[1])}
-}}""" for f in
-             self.exclude_filter])
+}}"""
+                for f in self.exclude_filter
+            ]
+        )
 
     def include_filter_to_prototxt(self):
-        return '\n' + '\n'.join(
-            [f"""include_filter {{
+        return "\n" + "\n".join(
+            [
+                f"""include_filter {{
   repo_match: \"{f[0]}\"
 {self.filter_arch_to_prototxt(f[1])}
-}}""" for f in
-             self.include_filter])
+}}"""
+                for f in self.include_filter
+            ]
+        )
 
     def to_prototxt(self):
         ret = f"""# kind: resf.peridot.v1.CatalogSync

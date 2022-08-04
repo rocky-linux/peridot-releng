@@ -38,7 +38,7 @@ from common import build_batches_url
 
 def get_batch(batch_type, task_id, status, page):
     r = requests.get(build_batches_url(batch_type, task_id, page, status))
-    return r.json()[f'{batch_type}s']
+    return r.json()[f"{batch_type}s"]
 
 
 def process_batch(batch_type, task_id, status):
@@ -52,18 +52,16 @@ def process_batch(batch_type, task_id, status):
         page = page + 1
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     batch_type = sys.argv[1]
     task_id = sys.argv[2]
 
     batch_items = process_batch(batch_type, task_id, 4)
 
     req = {}
-    key = f'{batch_type}s'
+    key = f"{batch_type}s"
     req[key] = []
     for item in batch_items:
-        req[key].append({
-            'package_name': item['name']
-        })
+        req[key].append({"package_name": item["name"]})
 
     print(json.dumps(req))

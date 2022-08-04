@@ -30,15 +30,13 @@
 import sys
 import json
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     build_type = sys.argv[1]
-    key = f'{build_type}s'
+    key = f"{build_type}s"
 
     req = {}
     req[key] = []
     for line in sys.stdin:
-        req[key].append({
-            'package_name': line.strip()
-        })
+        req[key].append({"package_name": line.strip()})
 
     print(json.dumps(req))

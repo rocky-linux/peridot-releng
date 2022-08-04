@@ -27,16 +27,16 @@
 #  ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
 #  POSSIBILITY OF SUCH DAMAGE.
 
-BASE_URL = 'https://peridot-api.build.resf.org/v1'
-PROJECT_ID_PROD = '55b17281-bc54-4929-8aca-a8a11d628738'
+BASE_URL = "https://peridot-api.build.resf.org/v1"
+PROJECT_ID_PROD = "55b17281-bc54-4929-8aca-a8a11d628738"
 
 
 def construct_url(path, project_id=PROJECT_ID_PROD):
-    return f'{BASE_URL}/projects/{project_id}{path}'
+    return f"{BASE_URL}/projects/{project_id}{path}"
 
 
-def build_batches_url(batch_type, task_id, page, status,
-    project_id=PROJECT_ID_PROD):
+def build_batches_url(batch_type, task_id, page, status, project_id=PROJECT_ID_PROD):
     return construct_url(
-        f'/{batch_type}_batches/{task_id}?page={page}&limit=100&filter.status={status}',
-        project_id)
+        f"/{batch_type}_batches/{task_id}?page={page}&limit=100&filter.status={status}",
+        project_id,
+    )

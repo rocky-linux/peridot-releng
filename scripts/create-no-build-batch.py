@@ -38,13 +38,14 @@ from common import construct_url
 
 def chunks(lst, n):
     for i in range(0, len(lst), n):
-        yield lst[i:i + n]
+        yield lst[i : i + n]
 
 
 def get_packages(page):
     r = requests.get(
-        construct_url(f'/packages?limit=100&page={page}&filters.no_builds=1'))
-    return r.json()['packages']
+        construct_url(f"/packages?limit=100&page={page}&filters.no_builds=1")
+    )
+    return r.json()["packages"]
 
 
 def process_packages():
@@ -58,13 +59,11 @@ def process_packages():
         page = page + 1
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     batch_items = process_packages()
 
     builds = []
     for item in batch_items:
-        builds.append({
-            'package_name': item['name']
-        })
+        builds.append({"package_name": item["name"]})
     for chunk in chunks(builds, 400):
         print(json.dumps({"builds": chunk}))
