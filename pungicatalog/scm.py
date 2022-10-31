@@ -33,8 +33,13 @@ import os
 
 class SCM:
     def __init__(self, pungi_base, scm_dict):
-        if scm_dict["scm"] == "file":
-            file_path = os.path.join(pungi_base, scm_dict["file"])
+        if  isinstance(scm_dict, str) or scm_dict["scm"] == "file":
+            file_path = ""
+            if not isinstance(scm_dict, str):
+                file_path = os.path.join(pungi_base, scm_dict["file"])
+            else:
+                file_path = os.path.join(pungi_base, scm_dict)
+
             f = open(file_path, "r")
             file_contents = f.read()
 
