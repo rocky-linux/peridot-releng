@@ -51,6 +51,12 @@ class PeridotCatalogSyncRepository:
     name: str
     include_filter: list[str]
     multilib: list[str]
+    module_streams: list[str]
+
+    def module_streams_to_prototxt(self):
+        return "\n" + "\n".join(
+            [f'    module_stream: "{f}"' for f in self.module_streams]
+        )
 
     def include_filter_to_prototxt(self):
         return "\n" + "\n".join(
@@ -65,22 +71,15 @@ class PeridotCatalogSyncRepository:
 class PeridotCatalogSyncPackage:
     name: str
     type: PeridotCatalogSyncPackageType
-    module_components: list[str]
     repositories: list[PeridotCatalogSyncRepository]
-
-    def mc_to_prototxt(self):
-        return "\n" + "\n".join(
-            [
-                f'  module_component: "{component}"'
-                for component in self.module_components
-            ]
-        )
 
     def repos_to_prototxt(self):
         return "\n".join(
             [
                 f"""  repository {{
     name: \"{repo.name}\"{
+            repo.module_streams_to_prototxt() if repo.module_streams else ""
+            }{
             repo.include_filter_to_prototxt() if repo.include_filter else ""
             }{
             repo.multilib_to_prototxt() if repo.multilib else ""
@@ -97,12 +96,50 @@ class PeridotCatalogSync:
     exclude_filter: list[tuple[str, dict]] = []
     include_filter: list[tuple[str, dict]] = []
     packages: list[PeridotCatalogSyncPackage] = []
+    module_defaults = None
+    major = 0
+    minor = 0
 
     def add_package(self, package: PeridotCatalogSyncPackage):
         self.packages.append(package)
 
-    def additional_multilib_to_prototxt(self):
+    def module_profile_to_prototxt(self, profile):
+        return "\n".join([f"            name: \"{p}\"" for p in profile])
+
+    def module_defaults_profiles_to_prototxt(self, profiles):
+        if not profiles:
+            return ""
+        return "\n" + "\n".join(
+            [f"""        profile {{
+            stream: \"{f}\"
+{self.module_profile_to_prototxt(profiles[f])}
+        }}
+""" for f in profiles.keys()]
+        )
+
+    def module_defaults_to_prototxt(self):
         return "\n".join(
+            [f"""    default {{
+        name: \"{f["data"]["module"]}\"
+        stream: \"{f["data"].get("stream", "")}\"{
+        self.module_defaults_profiles_to_prototxt(f["data"].get("profiles", []))
+}    }}""" for f in self.module_defaults]
+        ) if self.module_defaults else ""
+
+    def module_configuration_to_prototxt(self):
+        if not self.module_defaults:
+            return ""
+        return f"""module_configuration {{
+    platform {{
+        major: {self.major}
+        minor: {self.minor}
+        patch: 0
+    }}
+{self.module_defaults_to_prototxt()}
+}}"""
+
+    def additional_multilib_to_prototxt(self):
+        return "\n" + "\n".join(
             [f'additional_multilib: "{f}"' for f in self.additional_multilib]
         )
 
@@ -152,7 +189,9 @@ class PeridotCatalogSync:
 
     def to_prototxt(self):
         ret = f"""# kind: resf.peridot.v1.CatalogSync
-{self.additional_multilib_to_prototxt()}{
+{self.module_configuration_to_prototxt()}{
+        self.additional_multilib_to_prototxt()
+        }{
         self.exclude_multilib_filter_to_prototxt()
         }{
         self.exclude_filter_to_prototxt()
@@ -163,9 +202,7 @@ class PeridotCatalogSync:
         for pkg in self.packages:
             ret += f"""package {{
   name: "{pkg.name}"
-  type: {pkg.type}{
-            pkg.mc_to_prototxt() if pkg.module_components else ""
-            }
+  type: {pkg.type}
 {pkg.repos_to_prototxt()}
 }}
 """

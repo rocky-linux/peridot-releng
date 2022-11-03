@@ -29,6 +29,7 @@
 
 import argparse
 import os
+import yaml
 
 import kobo.conf
 
@@ -40,19 +41,49 @@ from catalog import (
 )
 from scm import SCM
 
+def get_modules_for_repo(package, repo, module_index):
+    if not repo in module_index:
+        return None
 
-def main(pungi_conf_path: str, output_path: str):
+    modules = []
+    for module in module_index[repo]:
+        if module.startswith(f"{package}:"):
+            modules.append(module.split(":")[1])
+
+    if len(modules) == 0:
+        return None
+
+    return modules
+
+def main(pungi_conf_path: str, output_path: str, major: int, minor: int):
     pungi_base = os.path.dirname(pungi_conf_path)
+    print(f"Using pungi base: {pungi_base}")
 
     conf = kobo.conf.PyConfigParser()
     conf.load_from_file(pungi_conf_path)
+    print(f"Loaded pungi config: {pungi_conf_path}")
 
+    print("Loading prepopulate...")
     gather_prepopulate_scm_dict = conf.get("gather_prepopulate")
     gpscm = SCM(pungi_base, gather_prepopulate_scm_dict)
     gpjson = gpscm.json()
 
+    # Get variants
+    print("Loading variants...")
+    variants_file_scm_dict = conf.get("variants_file")
+    vscm = SCM(pungi_base, variants_file_scm_dict)
+    vxml = vscm.xml()
+
+    # Get module defaults
+    print("Loading module defaults...")
+    module_defaults_file_scm_dict = conf.get("module_defaults_dir")
+    mdscm = SCM(pungi_base, module_defaults_file_scm_dict, ext_filters=[".yaml"])
+    mdtexts = mdscm.texts()
+
     # Create a catalog
     catalog = PeridotCatalogSync()
+    catalog.major = major
+    catalog.minor = minor
 
     # Set multilib filters
     catalog.additional_multilib.extend(list(conf.get("multilib_whitelist").values())[0])
@@ -66,6 +97,32 @@ def main(pungi_conf_path: str, output_path: str):
 
     # Create indexes
     package_index = {}
+    repo_module_index = {}
+    module_name_index = {}
+    module_defaults = []
+
+    # Add modules
+    for repo in gpjson.keys():
+        xml_path = f".//variant[@id='{repo}']/modules/module"
+        modules = vxml.findall(xml_path)
+        # No modules in repo, continue
+        if len(modules) == 0:
+            continue
+        for module in modules:
+            module_name = module.text.split(":")[0]
+            if not repo in repo_module_index:
+                repo_module_index[repo] = []
+            repo_module_index[repo].append(module.text)
+            module_name_index[module_name] = True
+            print(f"Found module: {module.text}")
+
+    # Add module defaults
+    for mdtext in mdtexts:
+        md = yaml.safe_load(mdtext)
+        module_defaults.append(md)
+
+    if len(module_defaults) > 0:
+        catalog.module_defaults = module_defaults
 
     # Read prepopulate json and create package objects
     all_arches = []
@@ -151,36 +208,43 @@ def main(pungi_conf_path: str, output_path: str):
         catalog.exclude_filter.append((repo_key, filter_tuple))
 
     for package in package_index.keys():
+        package_type = PeridotCatalogSyncPackageType.PACKAGE_TYPE_NORMAL_FORK
+        if package in module_name_index:
+            package_type = PeridotCatalogSyncPackageType.PACKAGE_TYPE_NORMAL_FORK_MODULE
+        elif package.startswith("rocky-"):
+            package_type = PeridotCatalogSyncPackageType.PACKAGE_TYPE_NORMAL_SRC
+
         catalog.add_package(
             PeridotCatalogSyncPackage(
                 package,
-                PeridotCatalogSyncPackageType.PACKAGE_TYPE_NORMAL_FORK
-                if not package.startswith("rocky-")
-                else PeridotCatalogSyncPackageType.PACKAGE_TYPE_NORMAL_SRC,
-                [],
+                package_type,
                 [
                     PeridotCatalogSyncRepository(
                         x,
                         package_index[package][x]["include_filter"],
                         package_index[package][x]["multilib"],
+                        (get_modules_for_repo(package, x, repo_module_index) if x in repo_module_index else None) if package in module_name_index else None,
                     )
                     for x in package_index[package].keys()
                 ],
             )
         )
 
+    print(f"Found {len(catalog.packages)} packages")
+
     f = open(output_path, "w")
     f.write(catalog.to_prototxt())
     f.close()
 
-    pass
-
+    print(f"Catalog written to {output_path}")
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(
         description="Convert Pungi configuration to Peridot compatible " "catalogs."
     )
     parser.add_argument("--pungi-conf-path", type=str, required=True)
+    parser.add_argument("--major", type=int, required=True)
+    parser.add_argument("--minor", type=int, required=True)
     parser.add_argument("--output-path", type=str, default="catalog.cfg")
     args = parser.parse_args()
-    main(args.pungi_conf_path, args.output_path)
+    main(args.pungi_conf_path, args.output_path, args.major, args.minor)

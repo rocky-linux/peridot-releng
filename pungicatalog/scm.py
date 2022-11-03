@@ -27,31 +27,84 @@
 #  ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
 #  POSSIBILITY OF SUCH DAMAGE.
 
+import xml.etree.ElementTree as ET
 import json
 import os
+import tempfile
 
+from git import Repo
 
 class SCM:
-    def __init__(self, pungi_base, scm_dict):
-        if  isinstance(scm_dict, str) or scm_dict["scm"] == "file":
-            file_path = ""
-            if not isinstance(scm_dict, str):
-                file_path = os.path.join(pungi_base, scm_dict["file"])
+    def __init__(self, pungi_base, scm_dict, ext_filters=None):
+        # Temporary hack since pungi-rocky usually has everything in one repo anyways
+        # todo(mustafa): remove this hack
+        base_file_path = ""
+        base_file_dir = ""
+        if isinstance(scm_dict, str):
+            base_file_path = scm_dict
+        else:
+            if scm_dict["scm"] == "file":
+                base_file_path = scm_dict["file"]
+            elif scm_dict["scm"] == "git":
+                if "file" in scm_dict:
+                    base_file_path = scm_dict["file"]
+                elif "dir" in scm_dict:
+                    base_file_dir = scm_dict["dir"]
             else:
-                file_path = os.path.join(pungi_base, scm_dict)
+                raise Exception("Unsupported SCM type")
+
+        file_contents = None
+        file_list_contents = []
+
+        if  isinstance(scm_dict, str) or scm_dict["scm"] == "file":
+            file_path = os.path.join(pungi_base, base_file_path)
 
             f = open(file_path, "r")
             file_contents = f.read()
+            f.close()
+        elif scm_dict["scm"] == "git":
+            with tempfile.TemporaryDirectory() as d:
+                print(f"Cloning {scm_dict['repo']}")
+                Repo.clone_from(scm_dict["repo"], d, branch=scm_dict["branch"], depth=1)
 
-            if file_path.endswith(".json"):
+                if base_file_path:
+                    print(f"Found file {base_file_path}")
+                    file_path = os.path.join(d, base_file_path)
+                    f = open(file_path, "r")
+                    file_contents = f.read()
+                    f.close()
+                elif base_file_dir:
+                    print(f"Reading files from {base_file_dir}")
+                    file_dir = os.path.join(d, base_file_dir)
+                    for file in os.listdir(file_dir):
+                        if file in [".git"]:
+                            continue
+                        if ext_filters:
+                            if not any(file.endswith(ext) for ext in ext_filters):
+                                continue
+                        file_path = os.path.join(file_dir, file)
+                        f = open(file_path, "r")
+                        file_list_contents.append(f.read())
+                        f.close()
+
+        if file_contents:
+            if base_file_path.endswith(".json"):
                 self.json_value = json.loads(file_contents)
+            elif base_file_path.endswith(".xml"):
+                self.xml_value = ET.fromstring(file_contents)
             else:
                 self.text_value = file_contents
-
-            f.close()
+        elif file_list_contents:
+            self.text_values = file_list_contents
 
     def json(self):
         return self.json_value
 
     def text(self):
         return self.text_value
+
+    def xml(self):
+        return self.xml_value
+
+    def texts(self):
+        return self.text_values
